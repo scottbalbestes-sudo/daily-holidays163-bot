@@ -1,6 +1,7 @@
 import os
 import html
 import re
+import time
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -9,7 +10,7 @@ from zoneinfo import ZoneInfo
 TOKEN = os.environ["TELEGRAM_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
 
-TZ = ZoneInfo("Europe/Moscow")
+TZ = ZoneInfo("Europe/Samara")
 
 MAX_HOLIDAYS = 15   # сколько праздников показывать
 MAX_WORLD = 0       # праздники других стран (0 = не показывать, например 5)
@@ -136,6 +137,15 @@ def send_message(text):
     response.raise_for_status()
 
 
+def wait_until(hour, minute):
+    now = datetime.now(TZ)
+    target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    delay = (target - now).total_seconds()
+    if 0 < delay <= 3600:
+        print("Жду", int(delay), "сек до", hour, ":", minute)
+        time.sleep(delay)
+
+
 def main():
     today = datetime.now(TZ)
 
@@ -146,6 +156,7 @@ def main():
     ]
 
     holidays, world, source = get_holidays()
+    wait_until(6, 30)
 
     message = (
         f"☀️ <b>Доброе утро!</b>\n\n"
