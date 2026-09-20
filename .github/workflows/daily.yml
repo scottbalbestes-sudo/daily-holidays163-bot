@@ -1,0 +1,29 @@
+name: Daily holidays
+
+on:
+  schedule:
+    - cron: "0 5 * * *"
+      timezone: "Europe/Moscow"
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Получить код
+        uses: actions/checkout@v4
+
+      - name: Установить Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Установить библиотеки
+        run: pip install -r requirements.txt
+
+      - name: Запустить бота
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python bot.py
