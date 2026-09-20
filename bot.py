@@ -22,8 +22,11 @@ HEADERS = {
     "Accept-Language": "ru-RU,ru;q=0.9",
 }
 
-SRC_MAIN = ("kakoysegodnyaprazdnik.ru", "https://kakoysegodnyaprazdnik.ru/")
+SRC_MAIN = ("my-calend.ru", "https://my-calend.ru/holidays")
 SRC_BACKUP = ("calend.ru", "https://www.calend.ru/")
+
+# «День таможенника – Беларусь»: длинное тире с пробелами и страна в конце
+FOREIGN = re.compile(r"\s[–—]\s\S")
 
 
 def fetch(url):
@@ -33,42 +36,41 @@ def fetch(url):
     return BeautifulSoup(response.text, "html.parser")
 
 
-def from_kakoysegodnyaprazdnik():
-    soup = fetch("https://kakoysegodnyaprazdnik.ru/")
+def from_my_calend():
+    soup = fetch("https://my-calend.ru/holidays")
 
-    listing = soup.select_one("div.listing_wr")
-    if listing is None:
-        print("kakoysegodnyaprazdnik: не найден блок listing_wr")
+    heading = None
+    for h in soup.find_all(["h1", "h2", "h3"]):
+        if "Праздники сегодня" in h.get_text():
+            heading = h
+            break
+
+    if heading is None:
+        print("my-calend: не найден заголовок «Праздники сегодня»")
         return [], []
 
-    # Всё, что идёт после div#national — праздники других стран
-    marker = listing.find(id="national")
-    foreign_ids = set()
-    if marker is not None:
-        foreign_ids = {
-            id(tag) for tag in marker.find_all_next("div", class_="main")
-        }
+    ul = heading.find_next("ul")
+    if ul is None:
+        print("my-calend: после заголовка нет списка")
+        return [], []
 
     main, world = [], []
 
-    for block in listing.find_all("div", class_="main"):
-        span = block.find("span", itemprop="text")
-        if span is None:
+    for li in ul.find_all("li"):
+        text = li.get_text(" ", strip=True)
+        # справа от названия стоит число (рейтинг) — убираем его
+        text = re.sub(r"\s*\d+\s*$", "", text).strip()
+
+        if not text:
             continue
 
-        text = span.get_text(" ", strip=True)
-        if not text or text.startswith("Именины"):
-            continue
-
-        if id(block) in foreign_ids:
-            if " - " in text and text not in world:
+        if FOREIGN.search(text):
+            if text not in world:
                 world.append(text)
-            continue
-
-        if text not in main:
+        elif text not in main:
             main.append(text)
 
-    print("kakoysegodnyaprazdnik: найдено", len(main), "и", len(world))
+    print("my-calend: найдено", len(main), "и", len(world))
     return main[:MAX_HOLIDAYS], world[:MAX_WORLD]
 
 
@@ -104,11 +106,11 @@ def from_calend():
 
 def get_holidays():
     try:
-        holidays, world = from_kakoysegodnyaprazdnik()
+        holidays, world = from_my_calend()
         if holidays:
             return holidays, world, SRC_MAIN
     except Exception as e:
-        print("kakoysegodnyaprazdnik не сработал:", repr(e))
+        print("my-calend не сработал:", repr(e))
 
     try:
         holidays = from_calend()
