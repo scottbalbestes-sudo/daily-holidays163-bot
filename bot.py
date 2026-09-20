@@ -15,6 +15,9 @@ TZ = ZoneInfo("Europe/Samara")
 MAX_HOLIDAYS = 15   # сколько праздников показывать
 MAX_WORLD = 0       # праздники других стран (0 = не показывать, например 5)
 
+# Новокуйбышевск
+LAT, LON = 53.10, 49.95
+
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -123,6 +126,44 @@ def get_holidays():
     return [], [], None
 
 
+def get_weather():
+    try:
+        response = requests.get(
+            "https://api.open-meteo.com/v1/forecast",
+            params={
+                "latitude": LAT,
+                "longitude": LON,
+                "daily": (
+                    "temperature_2m_max,temperature_2m_min,"
+                    "precipitation_probability_max,precipitation_sum"
+                ),
+                "timezone": "Europe/Samara",
+                "forecast_days": 1,
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        d = response.json()["daily"]
+
+        t_max = round(d["temperature_2m_max"][0])
+        t_min = round(d["temperature_2m_min"][0])
+        prob = d["precipitation_probability_max"][0] or 0
+        rain = d["precipitation_sum"][0] or 0
+    except Exception as e:
+        print("погода не получена:", repr(e))
+        return None
+
+    if prob >= 50 or rain >= 1:
+        verdict = "☔ Будет дождь, возьмите зонт"
+    elif prob >= 30:
+        verdict = "🌂 Дождь возможен, зонт лучше взять"
+    else:
+        verdict = "😎 Дождя не ожидается, зонт не нужен"
+
+    print("погода:", t_min, t_max, prob, rain)
+    return f"{verdict} (осадки: {prob}%)\n🌡 {t_min:+d}…{t_max:+d} °C"
+
+
 def send_message(text):
     response = requests.post(
         f"https://api.telegram.org/bot{TOKEN}/sendMessage",
@@ -156,14 +197,19 @@ def main():
     ]
 
     holidays, world, source = get_holidays()
+    weather = get_weather()
     wait_until(6, 30)
 
     message = (
         f"☀️ <b>Доброе утро!</b>\n\n"
         f"📅 Сегодня {today.day} {months[today.month - 1]} "
         f"{today.year} года\n\n"
-        f"🎉 <b>Праздники сегодня:</b>\n"
     )
+
+    if weather:
+        message += f"🌤 <b>Погода в Новокуйбышевске:</b>\n{weather}\n\n"
+
+    message += "🎉 <b>Праздники сегодня:</b>\n"
 
     if holidays:
         for holiday in holidays:
